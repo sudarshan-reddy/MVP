@@ -61,3 +61,12 @@ func (b *Block) AddTransaction(t *Transaction) {
 	b.transactions = append(b.transactions, *t)
 	sort.Sort(byTimestamp(b.transactions))
 }
+
+// Sign ...
+func (b *Block) Sign(keypair *Keypair) ([]byte, error) {
+	return keypair.Sign(b.hash())
+}
+
+func (b *Block) hash() []byte {
+	return getSHA256([]byte{})
+}
