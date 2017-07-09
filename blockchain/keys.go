@@ -10,7 +10,8 @@ import (
 )
 
 const (
-	keySize = 1
+	keySize     = 1
+	keyByteSize = 256
 )
 
 //Keypair holds the public and private keys
@@ -21,7 +22,8 @@ type Keypair struct {
 
 //NewKeypair generates a new keypair
 func NewKeypair() (*Keypair, error) {
-	var public, private []byte
+	public := make([]byte, keyByteSize)
+	private := make([]byte, keyByteSize)
 	pk, err := ecdsa.GenerateKey(elliptic.P224(), rand.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("error generating key, %s", err.Error())

@@ -82,3 +82,10 @@ func Test_DeserializeByParts(t *testing.T) {
 		assert.Equal(each.expectedOp, actualOp)
 	}
 }
+
+func Test_NewKeypair(t *testing.T) {
+	assert := assert.New(t)
+	keypair, err := NewKeypair()
+	assert.Nil(err)
+	t.Log(string(keypair.Public), string(keypair.Private))
+}
