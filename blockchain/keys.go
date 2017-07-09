@@ -4,10 +4,9 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"math/big"
-
-	"github.com/tv42/base58"
 )
 
 const (
@@ -22,14 +21,15 @@ type Keypair struct {
 
 //NewKeypair generates a new keypair
 func NewKeypair() (*Keypair, error) {
+	var public, private []byte
 	pk, err := ecdsa.GenerateKey(elliptic.P224(), rand.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("error generating key, %s", err.Error())
 	}
 
 	b := serializeWithLength(keySize, pk.PublicKey.X, pk.PublicKey.Y)
-	public := base58.EncodeBig([]byte{}, b)
-	private := base58.EncodeBig([]byte{}, pk.D)
+	base64.StdEncoding.Encode(public, b)
+	base64.StdEncoding.Encode(private, pk.D.Bytes())
 
 	kp := Keypair{Public: public, Private: private}
 	return &kp, nil
@@ -37,54 +37,61 @@ func NewKeypair() (*Keypair, error) {
 
 //Sign signs the keypair with proof of work
 func (k *Keypair) Sign(hash []byte) ([]byte, error) {
-	d, err := base58.DecodeToBig(k.Private)
+	var public, private, signature []byte
+	_, err := base64.StdEncoding.Decode(private, k.Private)
 	if err != nil {
 		return nil, err
 	}
 
-	b, _ := base58.DecodeToBig(k.Public)
+	_, err = base64.StdEncoding.Decode(public, k.Public)
+	if err != nil {
+		return nil, err
+	}
 
-	pub := deserializeByParts(b, 2)
+	pub := deserializeByParts(public, 2)
 	x, y := pub[0], pub[1]
 
-	key := ecdsa.PrivateKey{ecdsa.PublicKey{elliptic.P224(), x, y}, d}
+	privateBigInt := new(big.Int).SetBytes(private)
+	key := ecdsa.PrivateKey{
+		PublicKey: ecdsa.PublicKey{Curve: elliptic.P224(), X: x, Y: y},
+		D:         privateBigInt}
 
 	r, s, _ := ecdsa.Sign(rand.Reader, &key, hash)
 
-	return base58.EncodeBig([]byte{}, serializeWithLength(keySize, r, s)), nil
+	base64.StdEncoding.Encode(signature, serializeWithLength(keySize, r, s))
+	return signature, nil
 }
 
-func serializeWithLength(expectedLen int, bigValues ...*big.Int) *big.Int {
-	byteSetter := []byte{}
+func serializeWithLength(expectedLen int, bigValues ...*big.Int) []byte {
+	var result []byte
 	for i, b := range bigValues {
 		byteValue := b.Bytes()
 		diff := expectedLen - len(byteValue)
 		if diff > 0 && i != 0 {
 			byteValue = append(padBytes(diff, 0), byteValue...)
 		}
-		byteSetter = append(byteSetter, byteValue...)
+		result = append(result, byteValue...)
 	}
-	return new(big.Int).SetBytes(byteSetter)
+	return result
 }
 
-func deserializeByParts(blob *big.Int, parts int) []*big.Int {
-	bs := blob.Bytes()
-	if len(bs)%2 != 0 {
-		bs = append([]byte{0}, bs...)
+func deserializeByParts(blob []byte, parts int) []*big.Int {
+	if len(blob)%2 != 0 {
+		blob = append([]byte{0}, blob...)
 	}
 
-	l := len(bs) / parts
+	l := len(blob) / parts
 	as := make([]*big.Int, parts)
 
 	for i := range as {
-		as[i] = new(big.Int).SetBytes(bs[i*l : (i+1)*l])
+		as[i] = new(big.Int).SetBytes(blob[i*l : (i+1)*l])
 	}
 	return as
 }
 func padBytes(length int, byteValue byte) []byte {
 	var byteSlice []byte
 
-	for i := length; i > 0; i++ {
+	for i := 0; i < length; i++ {
 		byteSlice = append(byteSlice, byteValue)
 	}
 	return byteSlice
