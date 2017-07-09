@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	keySize = 100
+	keySize = 1
 )
 
 //Keypair holds the public and private keys
