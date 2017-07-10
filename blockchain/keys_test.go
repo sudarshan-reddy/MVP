@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"encoding/base64"
 	"math/big"
 	"testing"
 
@@ -85,7 +86,25 @@ func Test_DeserializeByParts(t *testing.T) {
 
 func Test_NewKeypair(t *testing.T) {
 	assert := assert.New(t)
-	keypair, err := NewKeypair()
+	_, err := NewKeypair()
 	assert.Nil(err)
-	t.Log(string(keypair.Public), string(keypair.Private))
+}
+
+func Test_Sign(t *testing.T) {
+	assert := assert.New(t)
+	var testData = []struct {
+		hash []byte
+	}{
+		{[]byte("abcdef")},
+		{[]byte("12312312312313123sdgvfbgsrny4th35t354etg3rg3r")},
+		{[]byte("dgv435y6u75u8%$#^T@YRHB$^jnbgnyrny")},
+	}
+	for _, each := range testData {
+		publicKey := make([]byte, 128)
+		keypair, _ := NewKeypair()
+		base64.StdEncoding.Decode(publicKey, keypair.Public)
+		signedHash, err := keypair.Sign(each.hash)
+		t.Log(string(signedHash))
+		assert.Nil(err)
+	}
 }
