@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -11,7 +12,7 @@ import (
 
 const (
 	keySize     = 1
-	keyByteSize = 256
+	keyByteSize = 128
 )
 
 //Keypair holds the public and private keys
@@ -33,27 +34,30 @@ func NewKeypair() (*Keypair, error) {
 	base64.StdEncoding.Encode(public, b)
 	base64.StdEncoding.Encode(private, pk.D.Bytes())
 
-	kp := Keypair{Public: public, Private: private}
+	kp := Keypair{Public: bytes.Trim(public, "\x00"),
+		Private: bytes.Trim(private, "\x00")}
 	return &kp, nil
 }
 
 //Sign signs the keypair with proof of work
 func (k *Keypair) Sign(hash []byte) ([]byte, error) {
-	var public, private, signature []byte
+	public := make([]byte, keyByteSize)
+	private := make([]byte, keyByteSize)
+	signature := make([]byte, keyByteSize)
 	_, err := base64.StdEncoding.Decode(private, k.Private)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error decoding private key: %s", err.Error())
 	}
 
 	_, err = base64.StdEncoding.Decode(public, k.Public)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error decoding public key: %s", err.Error())
 	}
 
 	pub := deserializeByParts(public, 2)
 	x, y := pub[0], pub[1]
 
-	privateBigInt := new(big.Int).SetBytes(private)
+	privateBigInt := new(big.Int).SetBytes(bytes.Trim(private, "\x00"))
 	key := ecdsa.PrivateKey{
 		PublicKey: ecdsa.PublicKey{Curve: elliptic.P224(), X: x, Y: y},
 		D:         privateBigInt}
@@ -78,15 +82,16 @@ func serializeWithLength(expectedLen int, bigValues ...*big.Int) []byte {
 }
 
 func deserializeByParts(blob []byte, parts int) []*big.Int {
-	if len(blob)%2 != 0 {
-		blob = append([]byte{0}, blob...)
+	bs := bytes.Trim(blob, "\x00")
+	if len(bs)%2 != 0 {
+		bs = append([]byte{0}, bs...)
 	}
 
-	l := len(blob) / parts
+	l := len(bs) / parts
 	as := make([]*big.Int, parts)
 
 	for i := range as {
-		as[i] = new(big.Int).SetBytes(blob[i*l : (i+1)*l])
+		as[i] = new(big.Int).SetBytes(bs[i*l : (i+1)*l])
 	}
 	return as
 }
